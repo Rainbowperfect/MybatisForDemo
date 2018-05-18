@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE configuration
+        PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-config.dtd">
+<!--xml配置文件包含对mybatis的核心设置，包含了数据库源，事务的控制和事务管理器-->
+
+<configuration>
+    <!--从外部引入文件-->
+    <!--<properties resource="classpath:jdbc.properties"/>-->
+        <!--mybatis数据源配置环境配置，这里的default指定的数据源环境必须存在-->
+    <typeAliases>
+        <package name="org.person.mybatis.model"></package>
+    </typeAliases>
+    <environments default="development">
+        <environment id="development">
+            <transactionManager type="JDBC"></transactionManager>
+            <dataSource type="POOLED">
+                <property name="driver" value="com.mysql.jdbc.Driver"/>
+                <property name="url" value="jdbc:mysql://localhost:3306/user?characterEncoding=utf-8"/>
+                <property name="username" value="root"/>
+                <property name="password" value="123456"/>
+<!--
+                <property name="driver" value="${jdbc.driver}"/>
+                <property name="url" value="${jdbc.url}"/>
+                <property name="username" value="${jdbc.username}"/>
+                <property name="password" value="${jdbc.password}"/>
+-->
+            </dataSource>
+        </environment>
+    </environments>
+    <mappers>
+        <!--<mapper resource="org/person/mybatis/mapper/UserDao.xml"></mapper>-->
+        <package name="org.person.mybatis"></package>
+    </mappers>
+
+</configuration>
