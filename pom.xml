@@ -251,11 +251,396 @@
 
 
 
+package com.huawei.dfx.projectwebsite.template.controller;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.core.MediaType;
+
+import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import com.huawei.dfx.cbb.entitle.user.UserConversionUtil;
+import com.huawei.dfx.cbb.web.controller.BaseController;
+import com.huawei.dfx.cbb.web.entity.BaseResponseMsg;
+import com.huawei.dfx.noticemessageservice.model.NoticeMessage;
+import com.huawei.dfx.noticemessageservice.service.NoticeMessageService;
+import com.huawei.support.cbb.util.security.CodeCCUtils;
+import com.huawei.support.contentstorageservice.common.util.json.JSONUtil;
+
+@Controller
+@RequestMapping("/message")
+public class MessageQueryController extends BaseController
+{
+	//日志操作
+	 public static final Logger LOG = LoggerFactory.getLogger(MessageQueryController.class);
+	 
+	 @Autowired
+	 private NoticeMessageService noticeMessageService;
+	 
+	 private Map<String, String> userMap = new HashMap<String, String>();
+	 
+	 /**
+	 * 模糊消息查詢
+	 * @param request
+	 * @param noticeMessage
+	 * @return
+	 */
+	 @RequestMapping(value = "/query/list/page", produces = MediaType.APPLICATION_JSON, method = RequestMethod.POST)
+	 @ResponseBody
+	public BaseResponseMsg queryMessage(HttpServletRequest request , @RequestBody NoticeMessage noticeMessage, String offset, String limit)
+	{
+		Map<String, Object> noticeMessageMap = new HashMap<String, Object>();
+		try
+		{
+			List<NoticeMessage> noticeMessages = new ArrayList<NoticeMessage>();
+			Integer messageCount = noticeMessageService.getNoticeMessageCount(noticeMessage);
+			if (messageCount > 0) 
+			{
+				noticeMessages = noticeMessageService.getMessageListByMessage(noticeMessage, Integer.valueOf(offset),
+						Integer.valueOf(limit));
+			}
+			getMessageInfos(noticeMessages);
+			noticeMessageMap.put("count", messageCount);
+			noticeMessageMap.put("noticeMessages", noticeMessages);
+			return buildResponse(Boolean.TRUE, noticeMessageMap);
+		} catch (Exception e) {
+
+			CodeCCUtils.errorLog(LOG, "请确认您要查詢的內容:", e);
+			return buildResponse(Boolean.FALSE, e);
+		}
+	}
+	 
+	@SuppressWarnings({ "unchecked" })
+	private void getMessageInfos(List<NoticeMessage> msgList) throws Exception 
+	{
+		for (NoticeMessage noticemsg : msgList)
+		{
+			String content = noticemsg.getContent();
+			Map<String, String> map = JSONUtil.stringToBean(noticemsg.getParams(), Map.class);
+			if (null == map || MapUtils.isEmpty(map))
+			{
+				continue;
+			}
+			String[] contents = StringUtils.split(content, "${");
+			for (String param : contents) {
+				String key = StringUtils.substring(param, 0, StringUtils.lastIndexOf(param, "}"));
+				if (StringUtils.isNotBlank(key) && map.containsKey(key))
+				{
+					String value = map.get(key);
+					if (StringUtils.isBlank(value))
+					{
+						continue;
+					}
+					value = getUserValue(value);
+					content = StringUtils.replace(content, "${" + key + "}", value);
+				}
+			}
+			noticemsg.setContent(content);
+			
+		}
+	}
+
+	private String getUserValue(String value)
+	{
+		if (!StringUtils.startsWith(value, "SU"))
+		{
+			return value;
+		}
+		if (userMap.containsKey(value))
+		{
+			return userMap.get(value);
+		}
+		try
+		{
+			String userId = UserConversionUtil.transSysUidToUserId(value);
+			if (StringUtils.isNotBlank(userId))
+			{
+				userMap.put(value, userId);
+				return userId;
+			}
+		}
+		catch (Exception e)
+		{
+			CodeCCUtils.errorLog(LOG, "getUserValue error!", e);
+		}
+		return value;
+	}
+}
+
+		 
+		 package com.huawei.dfx.noticemessageservice.service;
+//----------import-code-block-mark-begin----------
+import java.util.*;
+import com.huawei.tools.commonlib.exception.ServiceException;
+import com.huawei.dfx.noticemessageservice.model.NoticeMessage;
+//----------import-code-block-mark-end----------
+
+//----------class-code-block-mark-begin----------
+public interface NoticeMessageService {
+
+    String getServiceInfo(
+	) throws ServiceException;
+
+    String addNoticeMessage(
+	NoticeMessage noticeMessage) throws ServiceException;
+
+    List<String> addNoticeMessageBatch(
+	List<NoticeMessage> noticeMessageList) throws ServiceException;
+
+    Integer getNoticeMessageCount(
+	NoticeMessage noticeMessage) throws ServiceException;
+
+    List<NoticeMessage> getMessageListByMessage(
+	NoticeMessage noticeMessage,
+	Integer offset,
+	Integer limit) throws ServiceException;
+
+    String modifyNoticeMessage(
+	NoticeMessage noticeMessage) throws ServiceException;
+
+    Boolean modifyNoticeMessageBatch(
+	List<NoticeMessage> noticeMessageList) throws ServiceException;
+
+    Boolean modifyNoticeMessageByuser(
+	NoticeMessage noticeMessage) throws ServiceException;
+
+}
+//----------class-code-block-mark-end----------
 
 
 
 
+		 package com.huawei.dfx.noticemessageservice.service.impl;
+//----------import-code-block-mark-begin----------
+import java.util.*;
+import org.springframework.web.method.annotation.MethodArgumentConversionNotSupportedException;
+import org.springframework.web.bind.annotation.*;
+import com.huawei.dfx.noticemessageservice.model.NoticeMessage;
+import com.huawei.dfx.noticemessageservice.delegate.NoticeMessageServiceDelegate;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import javax.validation.*;
+import com.huawei.tools.commonlib.exception.ServiceException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.servlet.mvc.multiaction.NoSuchRequestHandlingMethodException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import javax.validation.constraints.*;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
+import com.huawei.dfx.noticemessageservice.service.NoticeMessageService;
+import org.springframework.http.converter.HttpMessageNotWritableException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+//----------import-code-block-mark-end----------
 
+//----------class-code-block-mark-begin----------
+@RestController
+public class NoticeMessageServiceController implements NoticeMessageService{
+
+    @Autowired 
+    private NoticeMessageServiceDelegate delegate;
+    
+
+		
+    @Override
+    public String getServiceInfo(
+           ) 
+    	throws ServiceException
+    { 
+		
+    
+		return delegate.getServiceInfo();
+    }
+    @Override
+    public String addNoticeMessage(
+           
+    		@Valid @RequestBody NoticeMessage noticeMessage) 
+    	throws ServiceException
+    { 
+		
+    
+		return delegate.addNoticeMessage(noticeMessage);
+    }
+    @Override
+    public List<String> addNoticeMessageBatch(
+           
+    		@Valid @RequestBody List<NoticeMessage> noticeMessageList) 
+    	throws ServiceException
+    { 
+		
+    
+		return delegate.addNoticeMessageBatch(noticeMessageList);
+    }
+    @Override
+    public Integer getNoticeMessageCount(
+           
+    		@Valid @RequestBody NoticeMessage noticeMessage) 
+    	throws ServiceException
+    { 
+		
+    
+		return delegate.getNoticeMessageCount(noticeMessage);
+    }
+    @Override
+    public List<NoticeMessage> getMessageListByMessage(
+           
+    		@Valid @RequestBody NoticeMessage noticeMessage, 
+    		
+    		@NotNull() @RequestParam(value = "offset", required = true)Integer offset,
+    		
+    		@NotNull() @RequestParam(value = "limit", required = true)Integer limit) 
+    	throws ServiceException
+    { 
+		
+    
+		return delegate.getMessageListByMessage(noticeMessage
+			, offset
+			, limit);
+    }
+    @Override
+    public String modifyNoticeMessage(
+           
+    		@Valid @RequestBody NoticeMessage noticeMessage) 
+    	throws ServiceException
+    { 
+		
+    
+		return delegate.modifyNoticeMessage(noticeMessage);
+    }
+    @Override
+    public Boolean modifyNoticeMessageBatch(
+           
+    		@Valid @RequestBody List<NoticeMessage> noticeMessageList) 
+    	throws ServiceException
+    { 
+		
+    
+		return delegate.modifyNoticeMessageBatch(noticeMessageList);
+    }
+    @Override
+    public Boolean modifyNoticeMessageByuser(
+           
+    		@Valid @RequestBody NoticeMessage noticeMessage) 
+    	throws ServiceException
+    { 
+		
+    
+		return delegate.modifyNoticeMessageByuser(noticeMessage);
+    }
+    @ResponseBody
+    @ExceptionHandler(HttpMessageNotReadableException.class)  
+	public Map<String,Object> httpMessageNotReadableExceptionHandler(
+		HttpMessageNotReadableException runtimeException) {  
+	         
+	  Map<String, Object> model = new HashMap<String, Object>();  
+	  model.put("status", "error"); 
+	  model.put("errorMsg", "Request Parameter format is not correct");
+	  return model;  
+	 }  
+    
+    @ResponseBody
+    @ExceptionHandler(HttpMessageNotWritableException.class)  
+    public Map<String,Object> httpMessageNotWritableExceptionHandler(
+    	HttpMessageNotWritableException runtimeException) {  
+    	
+    	Map<String, Object> model = new HashMap<String, Object>();  
+    	model.put("status", "error"); 
+    	model.put("errorMsg", "Internal Server Error");
+    	return model;  
+    }  
+    
+    @ResponseBody
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)  
+    public Map<String,Object> httpRequestMethodNotSupportedExceptionHandler(
+    	HttpRequestMethodNotSupportedException runtimeException) {  
+    	
+    	Map<String, Object> model = new HashMap<String, Object>();  
+    	model.put("status", "error"); 
+    	model.put("errorMsg", "Reuqest Method is not support!");
+    	return model;  
+    }  
+    
+    @ResponseBody
+    @ExceptionHandler(NoSuchRequestHandlingMethodException.class)  
+    public Map<String,Object> noSuchRequestHandlingMethodExceptionHandler(
+    	NoSuchRequestHandlingMethodException  runtimeException) {  
+    	
+    	Map<String, Object> model = new HashMap<String, Object>();  
+    	model.put("status", "error"); 
+    	model.put("errorMsg", "No such Request!");
+    	return model;  
+    }  
+    
+    @ResponseBody
+    @ExceptionHandler(MissingServletRequestParameterException.class)  
+    public Map<String,Object> missingServletRequestParameterExceptionHandler(
+    	MissingServletRequestParameterException  runtimeException) {  
+    	
+    	Map<String, Object> model = new HashMap<String, Object>();  
+    	model.put("status", "error"); 
+    	model.put("errorMsg", "Miss Servlet Request Parmater!");
+    	return model;  
+    }
+    
+    @ResponseBody
+    @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)  
+    public Map<String,Object> httpMediaTypeNotAcceptableExceptionHandler(
+    	HttpMediaTypeNotAcceptableException  runtimeException) {  
+    	
+    	Map<String, Object> model = new HashMap<String, Object>();  
+    	model.put("status", "error"); 
+    	model.put("errorMsg", "HttpMediaType Not Acceptable!");
+    	return model;  
+    }
+    
+     @ResponseBody
+	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
+	public Map<String, Object> methodArgumentTypeMismatchExceptionHandler(
+			MethodArgumentTypeMismatchException runtimeException) {
+
+		Map<String, Object> model = new HashMap<String, Object>();
+		model.put("status", "error");
+		model.put("errorMsg",
+				"Method Argument Type Mismatch Exception!");
+		return model;
+	}
+    
+    @ResponseBody
+    @ExceptionHandler(MethodArgumentConversionNotSupportedException.class)
+    public Map<String, Object> methodArgumentConversionNotSupportedExceptionHandler(
+    		MethodArgumentConversionNotSupportedException runtimeException) {
+    	
+    	Map<String, Object> model = new HashMap<String, Object>();
+    	model.put("status", "error");
+    	model.put("errorMsg",
+    			"Method Argument Conversion Not Supported Exception!");
+    	return model;
+    }
+    
+    @ResponseBody
+    @ExceptionHandler(IllegalArgumentException.class)  
+    public Map<String,Object> illegalArgumentExceptionHandler(
+    	IllegalArgumentException  runtimeException) {  
+    	
+    	Map<String, Object> model = new HashMap<String, Object>();  
+    	model.put("status", "error"); 
+    	model.put("errorMsg", "Illegal Argument Exception!");
+    	return model;  
+    }
+
+}
+//----------class-code-block-mark-end----------
 
 
 
