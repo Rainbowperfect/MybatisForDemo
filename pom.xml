@@ -110,3 +110,169 @@
 
 
 </project>
+
+
+
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.huawei.dfx.noticemessageservice.dao.mapper.NoticeMessageMapper">
+
+
+	<resultMap id="NoticeMessageResultMap"
+		type="com.huawei.dfx.noticemessageservice.model.NoticeMessage">
+		<id property="msgId" column="MSGID" />
+		<result property="content" column="CONTENT" />
+		<result property="params" column="PARAMS" />
+		<result property="owner" column="OWNER" />
+		<result property="createTime" column="CREATE_TIME" />	
+		<result property="source" column="SOURCE" />	
+		<result property="status" column="STATUS" />
+	</resultMap> 
+	
+		
+   	 
+   	 <select id="getNoticeMessageCount" parameterType="com.huawei.dfx.noticemessageservice.model.NoticeMessage" resultType="int">
+		SELECT
+		<![CDATA[
+			count(MSGID)
+		]]> 
+		FROM t_message t
+		WHERE 1=1
+		<include refid="queryCondition"/>
+    </select>
+    
+    <select id="getMessageListByMessage" parameterType="com.huawei.dfx.noticemessageservice.model.NoticeMessage" resultMap="NoticeMessageResultMap" >
+		<include refid="selectTemplate"/>
+		WHERE 1=1
+		<include refid="queryCondition"/>
+		ORDER BY t.CREATE_TIME DESC
+		limit #{offset},#{limit}
+	</select>
+   	 
+   	 
+   	 <sql id="selectTemplate">
+	   SELECT 
+	   		t.MSGID,
+	   		t.CONTENT,
+	   		t.PARAMS,
+	   		t.OWNER,
+		    DATE_FORMAT(t.CREATE_TIME, '%Y-%m-%d %H:%i:%s') AS createTime,
+	   		t.SOURCE,
+	   		t.STATUS
+		FROM  t_message t
+	</sql> 
+	
+	<sql id="queryCondition">
+		 <if test="noticeMessage.msgId != null and noticeMessage.msgId != ''"> 
+		   	 AND t.MSGID = #{noticeMessage.msgId, jdbcType=VARCHAR}
+		 </if>
+		 <if test="noticeMessage.owner != null and noticeMessage.owner != ''"> 
+		   	 AND (INSTR(Upper(t.OWNER),Upper(#{noticeMessage.owner})) > 0 )	 
+		 </if>
+		 <if test="noticeMessage.source != null and noticeMessage.source != ''"> 
+		   	 AND t.SOURCE = #{noticeMessage.source, jdbcType=VARCHAR}
+		 </if>
+		 <if test="noticeMessage.status != null and noticeMessage.status != ''"> 
+		   	 AND t.STATUS = #{noticeMessage.status, jdbcType=VARCHAR}
+		 </if>
+		 <if test="noticeMessage.keywords != null and noticeMessage.keywords != ''"> 
+		   	 AND (INSTR(Upper(t.CONTENT),Upper(#{noticeMessage.keywords})) > 0 OR INSTR(Upper(t.PARAMS),Upper(#{noticeMessage.keywords})) > 0)
+		 </if>
+		 <if test="noticeMessage.paramsQueryKey != null and noticeMessage.paramsQueryKey != '' and noticeMessage.paramsQueryValue != null and noticeMessage.paramsQueryValue != ''"> 
+		 	<![CDATA[
+		   		AND  t.params -> #{noticeMessage.paramsQueryKey} = #{noticeMessage.paramsQueryValue}
+			]]> 
+		 </if>
+		 
+	</sql>
+	
+	<insert id="addNoticeMessage" parameterType="com.huawei.dfx.noticemessageservice.model.NoticeMessage">
+		INSERT INTO
+		t_message 
+		(
+		MSGID,
+		CONTENT,
+		PARAMS,
+		OWNER,
+		CREATE_TIME,
+		SOURCE,
+		STATUS
+		)
+		VALUES
+		(
+		#{msgId},
+		#{content},
+		#{params},
+		#{owner},
+		now(),
+		#{source},
+		#{status}
+		)
+	</insert>
+
+	<update id="modifyNoticeMessage" parameterType="com.huawei.dfx.noticemessageservice.model.NoticeMessage">
+		UPDATE t_message
+		<trim prefix="set" suffixOverrides=",">
+			<if test="content != null and content != ''">
+				CONTENT = #{content},
+			</if>
+			<if test="params != null and params != ''">
+				PARAMS = #{params},
+			</if>
+			<if test="owner != null and owner != ''">
+				OWNER = #{owner},
+			</if>
+			<if test="createTime != null and createTime != ''">
+				CREATE_TIME = #{createTime},
+			</if>
+			<if test="source != null and source != ''">
+				SOURCE = #{source},
+			</if>
+			<if test="status != null and status != ''">
+				STATUS = #{status},
+			</if>
+		</trim>
+		WHERE MSGID = #{msgId}
+	</update>
+	
+	<update id="modifyNoticeMessageByuser" parameterType="com.huawei.dfx.noticemessageservice.model.NoticeMessage">
+		UPDATE t_message
+		<trim prefix="set" suffixOverrides=",">
+			<if test="status != null and status != ''">
+				STATUS = #{status},
+			</if>
+		</trim>
+		WHERE OWNER = #{owner}
+	</update>
+</mapper>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
