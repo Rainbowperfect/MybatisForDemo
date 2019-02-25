@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.org.person.mapper.EmployeeMapper">
+    
+    <select id="getEmployee" resultMap="org.person.pojo.Employee">
+      SELECT * from employee where id=#{id};
+    </select>
+
+
+    <insert id="insertEmp" >
+    INSERT  INTO employee(id,lastName,email,gender,d_id) VALUES (#{id},#{lastName},#{email},#{gender},#{d_id});
+    </insert>
+</mapper>

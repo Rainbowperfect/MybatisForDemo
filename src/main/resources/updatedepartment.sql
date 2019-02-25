@@ -1,0 +1,1 @@
+INSERT into department VALUES (3,'耻辱');
